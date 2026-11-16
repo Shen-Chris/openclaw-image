@@ -1,0 +1,4 @@
+# Allowlist: this derived image does not need any source or local data.
+**
+!Dockerfile
+!.dockerignore
