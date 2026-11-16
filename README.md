@@ -79,11 +79,14 @@ python3 scripts/resolve-image.py --version latest --repository Shen-Chris/opencl
 ```bash
 python3 -m unittest discover -s tests -v
 bash -n scripts/smoke-test.sh
+sh -n scripts/smoke-checks.sh
 ```
 
 ## 验收范围
 
 构建后先用无网络、无生产挂载、无认证资料的临时容器检查：非 root 用户、OpenClaw 程序版本、vim、nc 代理参数、ffmpeg、中文字体查询以及 Chromium 可执行文件。全部通过后才发布版本标签。
+
+检查器逐项输出 `[CHECK]`，失败时输出阶段名与退出码，并把失败日志写入 Actions 摘要。字体检查显式查询 `Noto Sans CJK SC` 并验证实际字体文件，不把系统默认字体必须为 Noto 当作前提。
 
 这不是生产环境端到端验收，**不证明**真实浏览器导航、QQ/微信、订阅 OAuth、MCP 或历史数据迁移成功。
 

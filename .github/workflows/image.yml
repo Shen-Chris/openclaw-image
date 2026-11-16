@@ -46,6 +46,7 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -v
           bash -n scripts/smoke-test.sh
+          sh -n scripts/smoke-checks.sh
 
       - name: Resolve official stable browser image and digest
         id: plan
@@ -105,19 +106,24 @@ jobs:
           cache-to: type=gha,mode=max,scope=openclaw-derived-amd64
 
       - name: Smoke test without production state
+        id: smoke
         if: steps.existing.outputs.found != 'true'
         env:
           IMAGE_REF: ${{ steps.plan.outputs.image_ref }}
           EXPECTED_VERSION: ${{ steps.plan.outputs.version }}
-        run: bash scripts/smoke-test.sh "$IMAGE_REF" "$EXPECTED_VERSION"
+        run: |
+          set -o pipefail
+          bash scripts/smoke-test.sh "$IMAGE_REF" "$EXPECTED_VERSION" 2>&1 | tee /tmp/openclaw-smoke.log
 
       - name: Publish the versioned image only after tests pass
+        id: publish
         if: steps.existing.outputs.found != 'true'
         env:
           IMAGE_REF: ${{ steps.plan.outputs.image_ref }}
         run: docker push "$IMAGE_REF"
 
       - name: Update candidate from an automatic latest-stable selection only
+        id: candidate
         if: steps.plan.outputs.update_candidate == 'true'
         env:
           IMAGE_REF: ${{ steps.plan.outputs.image_ref }}
@@ -127,20 +133,33 @@ jobs:
             --tag "$CANDIDATE_REF" "$IMAGE_REF"
 
       - name: Write build summary
+        if: always() && steps.plan.outcome == 'success'
         env:
           IMAGE_REF: ${{ steps.plan.outputs.image_ref }}
           BASE_IMAGE: ${{ steps.plan.outputs.base_image }}
           CANDIDATE_REF: ${{ steps.plan.outputs.candidate_ref }}
           UPDATE_CANDIDATE: ${{ steps.plan.outputs.update_candidate }}
           ALREADY_PUBLISHED: ${{ steps.existing.outputs.found }}
+          SMOKE_RESULT: ${{ steps.smoke.outcome }}
+          PUBLISH_RESULT: ${{ steps.publish.outcome }}
+          CANDIDATE_RESULT: ${{ steps.candidate.outcome }}
         run: |
           {
             echo '## OpenClaw derived image'
             echo "- Official base: \`$BASE_IMAGE\`"
-            echo "- Versioned image: \`$IMAGE_REF\`"
+            echo "- Planned versioned image: \`$IMAGE_REF\`"
             echo "- Previously published: \`$ALREADY_PUBLISHED\`"
-            if [ "$UPDATE_CANDIDATE" = true ]; then
+            echo "- Smoke test: \`$SMOKE_RESULT\`"
+            echo "- Publish step: \`$PUBLISH_RESULT\`"
+            if [ "$UPDATE_CANDIDATE" = true ] && [ "$CANDIDATE_RESULT" = success ]; then
               echo "- Candidate: \`$CANDIDATE_REF\`"
+            fi
+            if [ "$SMOKE_RESULT" = failure ] && [ -f /tmp/openclaw-smoke.log ]; then
+              echo
+              echo '### Failed smoke-test diagnostics'
+              echo '```text'
+              tail -n 100 /tmp/openclaw-smoke.log
+              echo '```'
             fi
             echo '- No production deployment, server credentials, or state migration was performed.'
             echo '- Smoke tests check the CLI, tools and Chromium executable; they do not validate channels, OAuth, MCP or real browser navigation.'

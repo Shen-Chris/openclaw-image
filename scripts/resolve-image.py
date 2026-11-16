@@ -17,7 +17,7 @@ VERSION_RE = re.compile(r"20\d{2}\.\d{1,2}\.\d{1,2}(?:-\d+)?")
 DIGEST_RE = re.compile(r"sha256:[0-9a-f]{64}")
 RECIPE_FILES = (
     "Dockerfile", "image-config.json", "scripts/resolve-image.py",
-    "scripts/smoke-test.sh", ".github/workflows/image.yml",
+    "scripts/smoke-test.sh", "scripts/smoke-checks.sh", ".github/workflows/image.yml",
 )
 ACCEPT = ", ".join((
     "application/vnd.oci.image.index.v1+json",
